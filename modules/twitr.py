@@ -25,8 +25,8 @@ def search_tweet_comments(api_context, tweet_target, keyword):
             k for k in
             api_context.search_tweets(f'@{tweet_target.user.screen_name}',
                                       since_id=tweet_target.id) if
-            k.in_reply_to_status_id == tweet_target.id # and
-            #keyword in re.sub(scrub_regex, '', k.text).lower()
+            k.in_reply_to_status_id == tweet_target.id and
+            keyword in re.sub(scrub_regex, '', k.text).lower()
         ]
         return(replies)
     except Exception as e:
