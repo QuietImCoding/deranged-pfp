@@ -1,59 +1,67 @@
-import sys,os
-import time
-import tweepy
-from PIL import Image, ImageEnhance
-from wand.image import Image as wImage
+import sys, time
+from modules import twitr, imgs
 
-if len(sys.argv) < 3:
-    exit("You need more args fren\nFormat: python facemaker.py <twitter username> <input photo> [center x] [center y]")
+if len(sys.argv) < 5:
+    exit("Usage: python3 facemaker.py <username> <picture> <x> <y>")
 
 uname = sys.argv[1]
-inphoto = sys.argv[2]
 
-consumer_key = os.environ['CONSUMER_KEY']
-consumer_secret = os.environ['CONSUMER_SECRET']
-access_key = os.environ['ACCESS_KEY']
-access_secret = os.environ['ACCESS_SECRET']
+api = twitr.get_api_context()
 
-auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-auth.set_access_token(access_key, access_secret)
-api = tweepy.API(auth)
+im = imgs.open_image(sys.argv[2])
+center = (int(sys.argv[3]),int(sys.argv[4]))
 
-im = Image.open(inphoto)
-if len(sys.argv) < 5:
-    center = (1515, 740)
-else:
-    center = (sys.argv[3], sys.argv[4])
-scale = 350
-cur_sentiment = ''
-
+overlaid = False
 old_unhinged=-1
 old_likes=-1
+reply_ids = set()
+
+def calc_unhinged(tweet):
+    return(len(
+        [c for c in last_tweet.text if
+         c.isupper() or c == '!']) /
+           len(last_tweet.text))
+
+def process_img(img, replies, unhinged, likes):
+    im = imgs.crop_img(img, unhinged, center)
+    im.implode(amount= - (likes / 15))
+    for rep in replies:
+        if rep.id not in reply_ids:
+            print(f"DAN NO DETECTED FROM {rep.user.screen_name}")
+            im = imgs.overlay_pfp(api, rep.user.screen_name, im)
+            reply_ids.add(rep.id)
+    return(im)
+
+def update_check(replies, unhinged, likes):
+    return(unhinged != old_unhinged or
+           likes != old_likes or
+           {k.id for k in replies} != reply_ids)
 
 while True:
-    res = api.user_timeline(screen_name = uname, count = 1)
-    last_tweet = res[0]
-    last_tweet_text = last_tweet.text
-    last_tweet_likes = last_tweet.favorite_count
-    unhinged_rating = len([c for c in last_tweet_text if c.isupper() or c == '!']) / len(last_tweet_text)
-    if unhinged_rating != old_unhinged:
-        print(f'Found tweet: {last_tweet_text}')
-        print(f"New unhinged rating achieved: {unhinged_rating}")
-        scale = int(300 - (unhinged_rating * 100))
-        out = im.crop((center[0] - scale,
-                       center[1] - scale,
-                       center[0] + scale,
-                       center[1] + scale))
-        saturator = ImageEnhance.Color(out)
-        finished = saturator.enhance(1 + (10 * unhinged_rating))
-        finished.save('fried.jpg')
+    last_tweet = twitr.get_last_tweet(api, uname)
+    unhinged_rating = calc_unhinged(last_tweet)
+    kword_comments = twitr.search_tweet_comments(api, last_tweet, 'danno')
+    
+    if update_check(kword_comments, unhinged_rating, last_tweet.favorite_count):
+        if {k.id for k in kword_comments} != reply_ids:
+            print("resetting overlays...")
+            reply_ids = set()
+            
+        im = imgs.open_image(sys.argv[2])
+        im = process_img(im,
+                    kword_comments,
+                    unhinged_rating,
+                    last_tweet.favorite_count)
+        
+        print(f'Found tweet: {last_tweet.text}')
+        if unhinged_rating != old_unhinged:
+            print(f"New unhinged rating achieved: {unhinged_rating}")
+        if last_tweet.favorite_count != old_likes:
+            print(f"New like count achieved: {last_tweet.favorite_count}")
+            
+        old_likes = last_tweet.favorite_count
         old_unhinged = unhinged_rating
-    if last_tweet_likes != old_likes:
-        print(f'Found tweet: {last_tweet_text}')
-        print(f"New like count achieved: {last_tweet_likes}")
-        with wImage(filename='fried.jpg') as img:
-            img.implode(amount= - (last_tweet_likes / 10))
-            img.save(filename='explode.jpg')
-        old_likes = last_tweet_likes
-        api.update_profile_image('explode.jpg')
+
+        twitr.update_pfp(api, im)
+        
     time.sleep(5)

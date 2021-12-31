@@ -1,1 +1,1 @@
-web: python facemaker.py sadlyoddisfying baby.jpg
+web: python facemaker.py sadlyoddisfying imgs/campmoo.png 730 720
