@@ -20,7 +20,7 @@ def calc_unhinged(tweet):
     return(len(
         [c for c in last_tweet.text if
          c.isupper() or c == '!']) /
-           len(last_tweet.text))
+           len(last_tweet.text) if len(last_tweet.text) > 0 else 0)
 
 def process_img(img, replies, unhinged, likes):
     im = imgs.crop_img(img, unhinged, center)
