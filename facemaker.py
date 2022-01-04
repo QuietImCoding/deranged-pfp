@@ -40,7 +40,7 @@ def update_check(replies, unhinged, likes):
 while True:
     last_tweet = twitr.get_last_tweet(api, uname)
     unhinged_rating = calc_unhinged(last_tweet)
-    kword_comments = twitr.search_tweet_comments(api, last_tweet, r'dan.*((no)|(yes))')
+    kword_comments = twitr.search_tweet_comments(api, last_tweet, r'(dan.*((no)|(yes)))|hello')
     
     if update_check(kword_comments, unhinged_rating, last_tweet.favorite_count):
         if {k.id for k in kword_comments} != reply_ids:
